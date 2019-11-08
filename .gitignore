@@ -141,3 +141,5 @@ x509.genkey
 
 # Kdevelop4
 *.kdev4
+/proj2/userland/cmake-build-debug/
+/proj2/userland/CMakeLists.txt
