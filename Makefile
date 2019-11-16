@@ -2,8 +2,8 @@
 VERSION = 5
 PATCHLEVEL = 2
 SUBLEVEL = 11
-EXTRAVERSION =
-NAME = Bobtail Squid
+EXTRAVERSION = -cmsc421project2-aings1
+NAME = Project 2
 
 # *DOCUMENTATION*
 # To see a list of typical targets execute "make help"

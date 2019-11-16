@@ -284,6 +284,7 @@ __visible void do_syscall_64(unsigned long nr, struct pt_regs *regs)
 {
 	struct thread_info *ti;
 
+	// check to see if the current pid is in the ACL
 	enter_from_user_mode();
 	local_irq_enable();
 	ti = current_thread_info();
