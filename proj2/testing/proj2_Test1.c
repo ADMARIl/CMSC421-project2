@@ -9,8 +9,9 @@
  */
 
 #include <stdlib.h>
+#include <stdio.h>
 
 int main() {
-
+    printf("proj2_Test1");
     return 0;
 }
