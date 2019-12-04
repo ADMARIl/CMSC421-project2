@@ -13,5 +13,10 @@
 int main() {
     printf("proj2Proto_driver\n");
 
+    syscall_entry *syscallArray[437];
+    for (int i =0; i < 437; i++) {
+        syscallArray[i] = NULL;
+    }
+
     return 0;
 }

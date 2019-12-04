@@ -8,6 +8,9 @@
  * 
  */
 
+#ifndef PROJ2_PROTO_H
+#define PROJ2_PROTO_H
+
 #include <stdlib.h>
 //#include <sys/types.h>
 #include <stdio.h>
@@ -19,6 +22,7 @@
 //#include <rwlock.h>
 //#include <cred.h>
 
+/*
 struct mailBox_node {
     unsigned char* msg;
     struct mailBox_node* next;
@@ -30,17 +34,26 @@ struct mailbox {
     // create a read write lock for the specific mailbox
     // rwlock_t mailLock = __RW_LOCK_UNLOCKED(mailLock);;
 };
+*/
+
+typedef struct syscall_entry {
+    struct skipList_node *head;
+    int numProcesses;
+} syscall_entry;
 
 struct skipList_node {
     //struct list_head link;
-    unsigned long id;
+    unsigned long process_id;
     unsigned int towerHeight;
     struct skipList_node** next;
-    struct mailbox* mBox;
-    pid_t * accessList;
-    int numUsers;
+    // hypothetically I don't need these for this implementation
+    /*struct mailbox* mBox;
+    pid_t * accessList;*/
+    // int numUsers;
     // create a read write lock for a node on the skip list
     // rwlock_t slNodeLock = __RW_LOCK_UNLOCKED(slNodeLock);;
+
+
 };
 
 unsigned int MAX_SL_SIZE = 0;
@@ -75,8 +88,8 @@ int mbx421_init(unsigned int ptrs, unsigned int prob) {
     SL_TAIL = malloc(sizeof(struct skipList_node));
     SL_HEAD = malloc(sizeof(struct skipList_node));
     // set values to something we know is impossible
-    SL_HEAD->id = 0;
-    SL_TAIL->id = 0;
+    SL_HEAD->process_id = 0;
+    SL_TAIL->process_id = 0;
     // make them the max size so we can assign pointers correctly later
     SL_HEAD->towerHeight = MAX_SL_SIZE;
     SL_TAIL->towerHeight = MAX_SL_SIZE;
@@ -176,13 +189,13 @@ int mbx421_create(unsigned long id) {
         // keep a history of everything as we go down
         nodes[i] = currNode;
         // loop to find anything to the right that isn't a tail
-        while (currNode->next[currLevel]->id < id && currNode->next[currLevel] != SL_TAIL) {
+        while (currNode->next[currLevel]->process_id < id && currNode->next[currLevel] != SL_TAIL) {
             currNode = currNode->next[currLevel];
         }
     }
 
     // check if key already exists
-    if (currNode->next[0]->id == id) {
+    if (currNode->next[0]->process_id == id) {
         free(nodes);
         return EEXIST;
     }
@@ -207,7 +220,7 @@ int mbx421_create(unsigned long id) {
 
     // assign the pointers ahead and behind
     struct skipList_node *newNode = malloc(sizeof(struct skipList_node));
-    newNode->id = id;
+    newNode->process_id = id;
     newNode->towerHeight = newHeight;
     // set up empty mailbox
     newNode->mBox = malloc(sizeof(struct mailbox));
@@ -271,13 +284,13 @@ int mbx421_destroy(unsigned long id) {
             // keep a history of everything as we go down
             nodes[i] = currNode;
             // loop to find anything to the right that isn't a tail
-            while (currNode->next[currLevel]->id < id && currNode->next[currLevel] != SL_TAIL) {
+            while (currNode->next[currLevel]->process_id < id && currNode->next[currLevel] != SL_TAIL) {
                 currNode = currNode->next[currLevel];
             }
         }
         // node to keep track of data to help us re-stitch the list later
         currNode = currNode->next[currLevel];
-        if (currNode->id == id) {
+        if (currNode->process_id == id) {
             // restitch changed pointers
             for (i = 0; i < currNode->towerHeight; i++)
                 nodes[i]->next[i] = currNode->next[i];
@@ -339,3 +352,5 @@ return 0;
 SYSCALL_DEFINE2(sbx421_count, pid_t, proc, unsigned long, nr) {
 return 0;
 }*/
+
+#endif
