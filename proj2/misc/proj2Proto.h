@@ -39,13 +39,6 @@ struct skipList_node {
     unsigned int towerHeight;
     int blockCount;
     struct skipList_node** next;
-    // hypothetically I don't need these for this implementation
-    /*struct mailbox* mBox;
-    pid_t * accessList;*/
-    // int numUsers;
-    // create a read write lock for a node on the skip list
-    // rwlock_t slNodeLock = __RW_LOCK_UNLOCKED(slNodeLock);;
-
 
 };
 
