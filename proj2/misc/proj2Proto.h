@@ -51,6 +51,7 @@ struct skipList_node {
 
 unsigned int MAX_SL_SIZE = 10;
 unsigned int PROB = 15000;
+unsigned long NUM_SYS_CALLS = 437;
 bool INIT_STATE = false;
 
 syscall_entry *SC_ARR[437];
@@ -105,7 +106,7 @@ int skipList_create(unsigned long sysID, pid_t id) {
     if (id < 0)
         return ENOENT;
     // check if sysID is in range
-    if (sysID < 0)
+    if (sysID < 0 || sysID > NUM_SYS_CALLS)
         return ENODEV;
     // check if mailbox system has been initialized
     if (INIT_STATE == false)
@@ -209,13 +210,13 @@ int skipList_create(unsigned long sysID, pid_t id) {
 
 static int skipList_print(unsigned long sysID) {
     // check if sysID is in range
-    if (sysID < 0)
+    if (sysID < 0 || sysID > NUM_SYS_CALLS)
         return ENODEV;
     // check if the main system has been initialized
     if (!INIT_STATE)
         return ENODEV;
     // check if our specific sandbox has been initialized
-    if (SC_ARR[sysID]->init_state == false)
+    if (SC_ARR[sysID] == NULL)
         return ENODEV;
     printf("-------- Sandbox %lu -------- \n", sysID);
     printf("Currently Blocking %d processes \n", SC_ARR[sysID]->numProcesses);
@@ -248,13 +249,13 @@ int skipList_destroy(unsigned long sysID, pid_t id) {
     if (id < 0)
         return ENOENT;
     // check if sysID is in range
-    if (sysID < 0)
+    if (sysID < 0 || sysID > NUM_SYS_CALLS)
         return ENODEV;
     // check if the main system has been initialized
     if (!INIT_STATE)
         return ENODEV;
     // check if our specific sandbox has been initialized
-    if (SC_ARR[sysID]->init_state == false)
+    if (SC_ARR[sysID] == NULL)
         return ENODEV;
 
     else {
@@ -317,7 +318,7 @@ int skipList_search(unsigned long sysID, pid_t id) {
     if (!INIT_STATE)
         return ENODEV;
     // check if our specific sandbox has been initialized
-    if (SC_ARR[sysID]->init_state == false)
+    if (SC_ARR[sysID] == NULL)
         return ENODEV;
     else {
         // various vars to keep track of skipList parameters
@@ -362,13 +363,17 @@ int skipList_search(unsigned long sysID, pid_t id) {
 // TODO: Why is the return from void thing important?
 
 int sbx_init() {
-    // initialize the syscall array
-    int i;
-    for (i = 0; i < 437; i++) {
-        SC_ARR[i] = NULL;
+    if (INIT_STATE) {
+        return 0;
+    } else {
+        // initialize the syscall array
+        int i;
+        for (i = 0; i < 437; i++) {
+            SC_ARR[i] = NULL;
+        }
+        INIT_STATE = true;
+        return 0;
     }
-    INIT_STATE = true;
-    return 0;
 }
 // skipList data structure functions
 unsigned long sbx421_block(pid_t proc, unsigned long nr) {

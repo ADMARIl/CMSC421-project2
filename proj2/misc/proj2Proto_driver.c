@@ -43,7 +43,7 @@ int main() {
     }
 
     // print the current status of the sandboxes
-    // TODO: Test if this does anything weird when the box isnt initialized
+    // TODO: Test if this does anything weird when the box isn't initialized
     skipList_print(10);
     skipList_print(100);
     skipList_print(219);
@@ -55,6 +55,26 @@ int main() {
     skipList_destroy(100, 10);
     skipList_destroy(100, 700);
 
+    skipList_print(100);
+
+    printf("\n\n @@@@@  Testing Primary Syscalls @@@@@ \n\n");
+
+    // block test
+    printf("\nBLOCK: 100 & 200 should appear if you are root. PID of process should appear regardless of UID\n");
+    sbx421_block(100,100);
+    sbx421_block(200,100);
+
+    sbx421_block(0,100);
+
+    skipList_print(100);
+
+    // count test
+    printf("\nCOUNT: should be 0 (if you are root?)\n");
+    printf("%lu\n",sbx421_count(100, 100));
+
+    // unblock test
+    printf("\nUNBLOCK: 300 should not be here if you are root\n");
+    sbx421_unblock(300,100);
     skipList_print(100);
 
     return 0;
