@@ -22,29 +22,21 @@
 //#include <rwlock.h>
 //#include <cred.h>
 
-/*
-struct mailBox_node {
-    unsigned char* msg;
-    struct mailBox_node* next;
-};
 
-struct mailbox {
-    int numMessages;
-    struct mailBox_node *head;
-    // create a read write lock for the specific mailbox
-    // rwlock_t mailLock = __RW_LOCK_UNLOCKED(mailLock);;
-};
-*/
+// TODO: Move these struct definitions to /include so we can do external variables
 
 typedef struct syscall_entry {
-    struct skipList_node *head;
+    struct skipList_node *sl_head;
+    struct skipList_node *sl_tail;
     int numProcesses;
+    unsigned int sl_size;
 } syscall_entry;
 
 struct skipList_node {
     //struct list_head link;
-    unsigned long process_id;
+    pid_t process_id;
     unsigned int towerHeight;
+    int blockCount;
     struct skipList_node** next;
     // hypothetically I don't need these for this implementation
     /*struct mailbox* mBox;
@@ -56,12 +48,14 @@ struct skipList_node {
 
 };
 
-unsigned int MAX_SL_SIZE = 0;
+unsigned int MAX_SL_SIZE = 10;
 unsigned int PROB = 20000;
-unsigned int SL_SIZE = 0;
+//unsigned int SL_SIZE = 0;
 bool INIT_STATE = false;
-struct skipList_node *SL_HEAD;
-struct skipList_node *SL_TAIL;
+//struct skipList_node *SL_HEAD;
+//struct skipList_node *SL_TAIL;
+
+syscall_entry *SC_ARR[437];
 
 //
 // provided random generation functions
@@ -73,7 +67,7 @@ static unsigned int generate_random_int(void) {
     return (next_random / 65536) % 32768;
 }
 
-int mbx421_init(unsigned int ptrs, unsigned int prob) {
+/*int mbx421_init(unsigned int ptrs, unsigned int prob) {
     //seed_random((unsigned int)time(NULL));
     if (ptrs < 1 || prob < 1)
         return EINVAL;
@@ -89,40 +83,24 @@ int mbx421_init(unsigned int ptrs, unsigned int prob) {
     SL_HEAD = malloc(sizeof(struct skipList_node));
     // set values to something we know is impossible
     SL_HEAD->process_id = 0;
-    SL_TAIL->process_id = 0;
+    //SL_TAIL->process_id = 0;
     // make them the max size so we can assign pointers correctly later
     SL_HEAD->towerHeight = MAX_SL_SIZE;
-    SL_TAIL->towerHeight = MAX_SL_SIZE;
     // dynamically allocating nodes
     SL_HEAD->next = malloc(MAX_SL_SIZE * sizeof(struct skipList_node));
-    SL_TAIL->next = malloc(sizeof(struct skipList_node));
-    SL_TAIL->next[0] = NULL;
 
     // assign the next node of head to tail since there's nothing in the sl yet
     int i = 0;
     for (i = 0; i < ptrs; i++) {
-        SL_HEAD->next[i] = SL_TAIL;
+        SL_HEAD->next[i] = NULL;
     }
 
-    // set mailbox to null for now since we aren't using them yet
-    SL_HEAD->mBox = NULL;
-    SL_TAIL->mBox = NULL;
+    SL_HEAD->blockCount=0;
 
-    // create empty access control list
-    SL_HEAD->accessList = NULL;
-    SL_TAIL->accessList = NULL;
-
-    SL_HEAD->numUsers = 0;
-    SL_TAIL->numUsers = 0;
-
-    // initialize locks
-    //SL_HEAD->slNodeLock = __RW_LOCK_UNLOCKED(slNodeLock);
-    // tell the world that the skiplist is ready to roll
-    INIT_STATE = true;
     return 0;
-}
+}*/
 
-int mbx421_shutdown() {
+/*int mbx421_shutdown() {
     // check if mailbox system has been initialized
     if (INIT_STATE == false)
         return ENODEV;
@@ -131,14 +109,14 @@ int mbx421_shutdown() {
     struct skipList_node *currNode = SL_HEAD->next[0];
 
     // loop through level 0 until we hit the tail
-    while (SL_HEAD->next[0] != SL_TAIL) {
+    while (SL_HEAD->next[0] != NULL) {
         // move us forward so we don't lose our pointers
         SL_HEAD->next[0] = currNode->next[0];
         // free all the dynamically allocated stuff in the node
         free(currNode->next);
-        free(currNode->accessList);
+        //free(currNode->accessList);
         // free mailbox memory
-        struct mailBox_node *currMboxNode = currNode->mBox->head;
+        *//*struct mailBox_node *currMboxNode = currNode->mBox->head;
         while (currMboxNode != NULL) {
             struct mailBox_node *tempNode = currMboxNode->next;
             free(currMboxNode->msg);
@@ -147,24 +125,24 @@ int mbx421_shutdown() {
 
         }
         // free remaining memory
-        free(currNode->mBox);
+        free(currNode->mBox);*//*
         free(currNode);
 
         // check to see if we are at the end yet
-        if (SL_HEAD->next[0] != SL_TAIL) {
+        if (SL_HEAD->next[0] != NULL) {
             currNode = currNode->next[0];
         }
     }
     // free our beginning nodes
-    free(SL_TAIL->next);
-    free(SL_TAIL);
+    *//*free(SL_TAIL->next);
+    free(SL_TAIL);*//*
     free(SL_HEAD->next);
     free(SL_HEAD);
 
     return 0;
-}
+}*/
 
-int mbx421_create(unsigned long id) {
+int mbx421_create(int sysID, pid_t id) {
     // check if root
     /*uid_t uid = current_uid().val;
     uid_t euid = current_euid().val;
@@ -177,8 +155,34 @@ int mbx421_create(unsigned long id) {
 
     // lock
 
+    if (SC_ARR[sysID] == NULL) {
+        SC_ARR[sysID] = malloc(sizeof(syscall_entry));
+        // create the head and tail skip list nodes
+        SC_ARR[sysID]->sl_head = malloc(sizeof(struct skipList_node));
+        SC_ARR[sysID]->sl_tail = malloc(sizeof(struct skipList_node));
+        // set values to something we know is impossible
+        SC_ARR[sysID]->sl_tail->process_id = 0;
+        SC_ARR[sysID]->sl_head->process_id = 0;
+        //SL_TAIL->process_id = 0;
+        // make them the max size so we can assign pointers correctly later
+        SC_ARR[sysID]->sl_tail->towerHeight = MAX_SL_SIZE;
+        SC_ARR[sysID]->sl_head->towerHeight = MAX_SL_SIZE;
+        // dynamically allocating nodes
+        SC_ARR[sysID]->sl_head->next = malloc(MAX_SL_SIZE * sizeof(struct skipList_node));
+        SC_ARR[sysID]->sl_tail->next = malloc(sizeof(struct skipList_node));
+        SC_ARR[sysID]->sl_tail->next[0] = NULL;
+        // assign the next node of head to tail since there's nothing in the sl yet
+        int i = 0;
+        for (i = 0; i < MAX_SL_SIZE; i++) {
+            SC_ARR[sysID]->sl_head->next[i] = NULL;
+        }
+
+        SC_ARR[sysID]->sl_head->blockCount = 0;
+        SC_ARR[sysID]->numProcesses = 0;
+    }
+
     unsigned int currLevel = MAX_SL_SIZE - 1;
-    struct skipList_node *currNode = SL_HEAD;
+    struct skipList_node *currNode = SC_ARR[sysID]->sl_head;
     struct skipList_node **nodes = malloc(MAX_SL_SIZE * sizeof(struct skipList_node *));
     // loop through levels to find target key
     int i = 0;
@@ -189,7 +193,7 @@ int mbx421_create(unsigned long id) {
         // keep a history of everything as we go down
         nodes[i] = currNode;
         // loop to find anything to the right that isn't a tail
-        while (currNode->next[currLevel]->process_id < id && currNode->next[currLevel] != SL_TAIL) {
+        while (currNode->next[currLevel]->process_id < id && currNode->next[currLevel] != NULL) {
             currNode = currNode->next[currLevel];
         }
     }
@@ -222,7 +226,7 @@ int mbx421_create(unsigned long id) {
     struct skipList_node *newNode = malloc(sizeof(struct skipList_node));
     newNode->process_id = id;
     newNode->towerHeight = newHeight;
-    // set up empty mailbox
+    /*// set up empty mailbox
     newNode->mBox = malloc(sizeof(struct mailbox));
     newNode->mBox->numMessages = 0;
     // initialize linked list
@@ -231,7 +235,7 @@ int mbx421_create(unsigned long id) {
     newNode->mBox->head->msg = NULL;
 
     newNode->accessList = NULL;
-    newNode->numUsers = 0;
+    newNode->numUsers = 0;*/
 
     newNode->next = malloc(newHeight * sizeof(struct skipList_node));
 
@@ -241,8 +245,8 @@ int mbx421_create(unsigned long id) {
         nodes[i]->next[i] = newNode;
     }
     // increment size if we need to
-    if (newHeight-1 > SL_SIZE) {
-        SL_SIZE = newHeight-1;
+    if (newHeight-1 > SC_ARR[sysID]->sl_size) {
+        SC_ARR[sysID]->sl_size = newHeight-1;
     }
 
     // UNLOCK
