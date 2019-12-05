@@ -11,26 +11,49 @@
 #include "proj2Proto.h"
 
 int main() {
-    printf("proj2Proto_driver\n");
+    printf("proj2Proto_driver.c\n\n");
+    // initialize array of syscalls
+    sbx_init();
 
-    //syscall_entry *syscallArray[437];
-    for (int i =0; i < 437; i++) {
-        SC_ARR[i] = NULL;
+    int pids[] = {5, 3, 2, 8, 14, 443, 80, 87, 22, 90, 56, 2};
+
+    // add process ids to the sandboxes in different orders
+    for (int i = 0; i < 12; i++) {
+        skipList_create(10, pids[i]);
+    }
+    for (int i = 0; i < 12; i+=2) {
+        skipList_create(414, pids[i]);
+    }
+    for (int i = 11; i >= 0; i--) {
+        skipList_create(219, pids[i]);
     }
 
-    mbx421_create(100,100);
-    mbx421_create(100,200);
-    mbx421_create(100,300);
-    mbx421_create(100,10);
-    mbx421_create(100,700);
+    skipList_create(100, 100);
+    skipList_create(100, 200);
+    skipList_create(100, 300);
+    skipList_create(100, 10);
+    skipList_create(100, 700);
 
+    // test to see if search is working
+    // should print DNF
+    if (skipList_search(100, 201) == 0) {
+        printf("Found %d\n", 201);
+    } else {
+        printf("DNF\n");
+    }
+
+    // print the current status of the sandboxes
+    // TODO: Test if this does anything weird when the box isnt initialized
+    skipList_print(10);
     skipList_print(100);
+    skipList_print(219);
+    skipList_print(414);
 
-    mbx421_destroy(100,100);
-    mbx421_destroy(100,200);
-    //mbx421_destroy(100,300);
-    mbx421_destroy(100,10);
-    mbx421_destroy(100,700);
+    skipList_destroy(100, 100);
+    skipList_destroy(100, 200);
+    //skipList_destroy(100,300);
+    skipList_destroy(100, 10);
+    skipList_destroy(100, 700);
 
     skipList_print(100);
 

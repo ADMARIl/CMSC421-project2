@@ -321,7 +321,7 @@ SYSCALL_DEFINE2(sbx421_block, pid_t, proc, unsigned long, nr) {
     return 0;
 }
 
-SYCALL_DEFINE2(sbx421_unblock, pid_t, proc, unsigned long, nr) {
+SYSCALL_DEFINE2(sbx421_unblock, pid_t, proc, unsigned long, nr) {
     return 0;
 }
 

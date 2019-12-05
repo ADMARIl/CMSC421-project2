@@ -12,7 +12,7 @@
 #define PROJ2_PROTO_H
 
 #include <stdlib.h>
-//#include <sys/types.h>
+#include <sys/types.h>
 #include <stdio.h>
 #include <time.h>
 #include <string.h>
@@ -50,11 +50,8 @@ struct skipList_node {
 };
 
 unsigned int MAX_SL_SIZE = 10;
-unsigned int PROB = 20000;
-//unsigned int SL_SIZE = 0;
+unsigned int PROB = 15000;
 bool INIT_STATE = false;
-//struct skipList_node *SL_HEAD;
-//struct skipList_node *SL_TAIL;
 
 syscall_entry *SC_ARR[437];
 
@@ -67,39 +64,6 @@ static unsigned int generate_random_int(void) {
     next_random = next_random * 1103515245 + 12345;
     return (next_random / 65536) % 32768;
 }
-
-/*int mbx421_init(unsigned int ptrs, unsigned int prob) {
-    //seed_random((unsigned int)time(NULL));
-    if (ptrs < 1 || prob < 1)
-        return EINVAL;
-    // set the globals to their new values
-    MAX_SL_SIZE = ptrs+1;
-    PROB = prob;
-
-    //rwlock_init(&SL_LOCK, 0, NULL);
-    // seed random
-
-    // create the head and tail skip list nodes
-    SL_TAIL = malloc(sizeof(struct skipList_node));
-    SL_HEAD = malloc(sizeof(struct skipList_node));
-    // set values to something we know is impossible
-    SL_HEAD->process_id = 0;
-    //SL_TAIL->process_id = 0;
-    // make them the max size so we can assign pointers correctly later
-    SL_HEAD->towerHeight = MAX_SL_SIZE;
-    // dynamically allocating nodes
-    SL_HEAD->next = malloc(MAX_SL_SIZE * sizeof(struct skipList_node));
-
-    // assign the next node of head to tail since there's nothing in the sl yet
-    int i = 0;
-    for (i = 0; i < ptrs; i++) {
-        SL_HEAD->next[i] = NULL;
-    }
-
-    SL_HEAD->blockCount=0;
-
-    return 0;
-}*/
 
 /*int mbx421_shutdown() {
     // check if mailbox system has been initialized
@@ -131,15 +95,21 @@ static unsigned int generate_random_int(void) {
     return 0;
 }*/
 
-int mbx421_create(int sysID, pid_t id) {
+int skipList_create(unsigned long sysID, pid_t id) {
     // check if root
     /*uid_t uid = current_uid().val;
     uid_t euid = current_euid().val;
     if (uid > 0)
         return EPERM;*/
+    // check if pid is good first
+    if (id < 0)
+        return ENOENT;
+    // check if sysID is in range
+    if (sysID < 0)
+        return ENODEV;
     // check if mailbox system has been initialized
-    /*if (INIT_STATE == false)
-        return ENODEV;*/
+    if (INIT_STATE == false)
+        return ENODEV;
     // various vars to keep track of skipList parameters
 
     // lock
@@ -150,8 +120,8 @@ int mbx421_create(int sysID, pid_t id) {
         SC_ARR[sysID]->sl_head = malloc(sizeof(struct skipList_node));
         SC_ARR[sysID]->sl_tail = malloc(sizeof(struct skipList_node));
         // set values to something we know is impossible
-        SC_ARR[sysID]->sl_tail->process_id = 0;
-        SC_ARR[sysID]->sl_head->process_id = 0;
+        SC_ARR[sysID]->sl_tail->process_id = -1;
+        SC_ARR[sysID]->sl_head->process_id = -1;
         //SL_TAIL->process_id = 0;
         // make them the max size so we can assign pointers correctly later
         SC_ARR[sysID]->sl_tail->towerHeight = MAX_SL_SIZE;
@@ -206,7 +176,7 @@ int mbx421_create(int sysID, pid_t id) {
         unsigned int ranNum = generate_random_int();
         if ((32767 - ranNum) > PROB) {
             newHeight++;
-            ranNum = generate_random_int();
+            //ranNum = generate_random_int();
         } else {
             ceil = true;
         }
@@ -216,16 +186,6 @@ int mbx421_create(int sysID, pid_t id) {
     struct skipList_node *newNode = malloc(sizeof(struct skipList_node));
     newNode->process_id = id;
     newNode->towerHeight = newHeight;
-    /*// set up empty mailbox
-    newNode->mBox = malloc(sizeof(struct mailbox));
-    newNode->mBox->numMessages = 0;
-    // initialize linked list
-    newNode->mBox->head = malloc(sizeof(struct mailBox_node));
-    newNode->mBox->head->next = NULL;
-    newNode->mBox->head->msg = NULL;
-
-    newNode->accessList = NULL;
-    newNode->numUsers = 0;*/
 
     newNode->next = malloc(newHeight * sizeof(struct skipList_node));
 
@@ -239,6 +199,7 @@ int mbx421_create(int sysID, pid_t id) {
         SC_ARR[sysID]->sl_size = newHeight-1;
     }
 
+    SC_ARR[sysID]->numProcesses++;
     // UNLOCK
 
     free(nodes);
@@ -246,11 +207,18 @@ int mbx421_create(int sysID, pid_t id) {
     return 0;
 }
 
-static int skipList_print(int sysID) {
-    // check if mailbox system has been initialized
-    if (SC_ARR[sysID] == false)
+static int skipList_print(unsigned long sysID) {
+    // check if sysID is in range
+    if (sysID < 0)
         return ENODEV;
-    printf("%s", "-------- Skip List -------- \n");
+    // check if the main system has been initialized
+    if (!INIT_STATE)
+        return ENODEV;
+    // check if our specific sandbox has been initialized
+    if (SC_ARR[sysID]->init_state == false)
+        return ENODEV;
+    printf("-------- Sandbox %lu -------- \n", sysID);
+    printf("Currently Blocking %d processes \n", SC_ARR[sysID]->numProcesses);
     // loop through all the levels of the list so we can print out everything
     int i = 0;
     for (i = 0; i < MAX_SL_SIZE-1; i++) {
@@ -259,24 +227,10 @@ static int skipList_print(int sysID) {
         printf("      ");
         // set current pointer to head node
         struct skipList_node *currNode = SC_ARR[sysID]->sl_head;
-        while (currNode->next[i]->process_id > 0) {
+        while (currNode->next[i]->process_id > -1) {
             // move to next node and print it
             currNode = currNode->next[i];
             printf("%d ", currNode->process_id);
-
-            // print messages if we have them
-            // make sure we aren't at the head or tail before we try to access the messages
-            /*if (currNode != SL_HEAD && currNode != SL_TAIL) {
-                printf(": ");
-                // temp struct to help us traverse the messages
-                struct mailBox_node *currMboxNode = currNode->mBox->head;
-                while (currMboxNode->next != NULL) {
-                    printf("[message: %s] ", currMboxNode->next->msg);
-                    currMboxNode = currMboxNode->next;
-                }
-            } else {
-                printf(" ");
-            }*/
 
         }
         printf("\n");
@@ -284,18 +238,25 @@ static int skipList_print(int sysID) {
     return 0;
 }
 
-int mbx421_destroy(int sysID, unsigned long id) {
+int skipList_destroy(unsigned long sysID, pid_t id) {
     // check if root
     /*uid_t uid = current_uid().val;
     uid_t euid = current_euid().val;
     if (uid > 0)
         return EPERM;*/
-    // check if mailbox system has been initialized
-    if (SC_ARR[sysID]->init_state == false)
-        return ENODEV;
-    // check if exists first
+    // check if pid is good first
     if (id < 0)
         return ENOENT;
+    // check if sysID is in range
+    if (sysID < 0)
+        return ENODEV;
+    // check if the main system has been initialized
+    if (!INIT_STATE)
+        return ENODEV;
+    // check if our specific sandbox has been initialized
+    if (SC_ARR[sysID]->init_state == false)
+        return ENODEV;
+
     else {
         // various vars to keep track of skipList parameters
 
@@ -316,7 +277,7 @@ int mbx421_destroy(int sysID, unsigned long id) {
             // keep a history of everything as we go down
             nodes[i] = currNode;
             // loop to find anything to the right that isn't a tail
-            while (currNode->next[currLevel]->process_id < id && currNode->next[currLevel] != SC_ARR[sysID]->sl_size) {
+            while (currNode->next[currLevel]->process_id < id && currNode->next[currLevel] != SC_ARR[sysID]->sl_tail) {
                 currNode = currNode->next[currLevel];
             }
         }
@@ -329,18 +290,11 @@ int mbx421_destroy(int sysID, unsigned long id) {
             // free dynamically allocated stuff
             //free(nodes);
             free(currNode->next);
-            /*struct mailBox_node *currMboxNode = currNode->mBox->head;
-            while (currMboxNode != NULL) {
-                struct mailBox_node *tempNode = currMboxNode->next;
-                free(currMboxNode->msg);
-                free(currMboxNode);
-                currMboxNode = tempNode;
-
-            }
-            free(currNode->accessList);
-            free(currNode->mBox);*/
             free(currNode);
             free(nodes);
+
+            SC_ARR[sysID]->numProcesses--;
+
             return 0;
         }
             // return error if mailbox doesnt exist
@@ -355,20 +309,158 @@ int mbx421_destroy(int sysID, unsigned long id) {
 
 }
 
+int skipList_search(unsigned long sysID, pid_t id) {
+    // check if pid is good first
+    if (id < 0)
+        return ENOENT;
+    // check if the main system has been initialized
+    if (!INIT_STATE)
+        return ENODEV;
+    // check if our specific sandbox has been initialized
+    if (SC_ARR[sysID]->init_state == false)
+        return ENODEV;
+    else {
+        // various vars to keep track of skipList parameters
 
+        // LOCK
+
+        unsigned int currLevel = SC_ARR[sysID]->sl_size;
+        unsigned int targetHeight = 0;
+        struct skipList_node *currNode = SC_ARR[sysID]->sl_head;
+        struct skipList_node **nodes = malloc(SC_ARR[sysID]->sl_size * sizeof(struct skipList_node *) * 2);
+        // traverse through each level at a time
+        int i = 0;
+        for (i = SC_ARR[sysID]->sl_size; i >= 0; i--) {
+            // check if we aren't at the bottom yet
+            if (currLevel > 0) {
+                currLevel--;
+                targetHeight++;
+            }
+            // keep a history of everything as we go down
+            nodes[i] = currNode;
+            // loop to find anything to the right that isn't a tail
+            while (currNode->next[currLevel]->process_id < id && currNode->next[currLevel] != SC_ARR[sysID]->sl_tail) {
+                currNode = currNode->next[currLevel];
+            }
+        }
+        // node to keep track of data to help us re-stitch the list later
+        currNode = currNode->next[currLevel];
+        if (currNode->process_id == id) {
+            return 0;
+        }
+            // return error if mailbox doesnt exist
+        else {
+            free(nodes);
+            return ENOENT;
+        }
+
+        // UNLOCK
+
+    }
+}
+
+// TODO: Why is the return from void thing important?
+
+int sbx_init() {
+    // initialize the syscall array
+    int i;
+    for (i = 0; i < 437; i++) {
+        SC_ARR[i] = NULL;
+    }
+    INIT_STATE = true;
+    return 0;
+}
 // skipList data structure functions
 unsigned long sbx421_block(pid_t proc, unsigned long nr) {
+    // TODO: change uid and pid method for kernel use
 
-    return 0;
+    int uid = getuid();
+    pid_t pid = getpid();
+
+    if (proc > 0 && uid == 0) {
+        // Do this if the process id is greater than 0 and the USER is root
+
+        // if the perms checkout, add them to the respective sandbox
+        return skipList_create(nr, proc);
+    } else if (proc == 0) {
+        // If the process is 0, only the calling process can block a call for itself
+        return skipList_create(nr, pid);
+    } else {
+        // if the security conditions aren't met return and error
+        return EACCES;
+    }
+
 }
 
 unsigned long sbx421_unblock(pid_t proc, unsigned long nr) {
+    // TODO: Change uid method for kernel
 
-    return 0;
+    int uid = getuid();
+
+    if (uid == 0) {
+        return skipList_destroy(nr, proc);
+    } else {
+        return EPERM;
+    }
 }
 
 unsigned long sbx421_count(pid_t proc, unsigned long nr) {
+    // TODO: Change the uid method for kernel
+    int uid = getuid();
+    // check if the proc is in range
+    if (proc < 1) {
+        return ENOENT;
+    }
+    // check if we are root
+    else if (uid == 0) {
+        // check if pid is good first
+        if (proc < 0)
+            return ENOENT;
+        // check if the main system has been initialized
+        if (!INIT_STATE)
+            return ENODEV;
+        // check if our specific sandbox has been initialized
+        if (SC_ARR[nr]->init_state == false)
+            return ENODEV;
+        else {
+            // various vars to keep track of skipList parameters
 
+            // LOCK
+
+            unsigned int currLevel = SC_ARR[nr]->sl_size;
+            unsigned int targetHeight = 0;
+            struct skipList_node *currNode = SC_ARR[nr]->sl_head;
+            struct skipList_node **nodes = malloc(SC_ARR[nr]->sl_size * sizeof(struct skipList_node *) * 2);
+            // traverse through each level at a time
+            int i = 0;
+            for (i = SC_ARR[nr]->sl_size; i >= 0; i--) {
+                // check if we aren't at the bottom yet
+                if (currLevel > 0) {
+                    currLevel--;
+                    targetHeight++;
+                }
+                // keep a history of everything as we go down
+                nodes[i] = currNode;
+                // loop to find anything to the right that isn't a tail
+                while (currNode->next[currLevel]->process_id < proc && currNode->next[currLevel] != SC_ARR[nr]->sl_tail) {
+                    currNode = currNode->next[currLevel];
+                }
+            }
+            // node to keep track of data to help us re-stitch the list later
+            currNode = currNode->next[currLevel];
+            if (currNode->process_id == proc) {
+                return currNode->blockCount;
+            }
+                // return error if mailbox doesnt exist
+            else {
+                free(nodes);
+                return ENOENT;
+            }
+
+            // UNLOCK
+
+        }
+    }
     return 0;
 }
 
@@ -377,7 +469,7 @@ SYSCALL_DEFINE2(sbx421_block, pid_t, proc, unsigned long, nr) {
 return 0;
 }
 
-SYCALL_DEFINE2(sbx421_unblock, pid_t, proc, unsigned long, nr) {
+SYSCALL_DEFINE2(sbx421_unblock, pid_t, proc, unsigned long, nr) {
 return 0;
 }
 
