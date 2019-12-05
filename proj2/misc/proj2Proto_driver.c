@@ -26,5 +26,13 @@ int main() {
 
     skipList_print(100);
 
+    mbx421_destroy(100,100);
+    mbx421_destroy(100,200);
+    //mbx421_destroy(100,300);
+    mbx421_destroy(100,10);
+    mbx421_destroy(100,700);
+
+    skipList_print(100);
+
     return 0;
 }
