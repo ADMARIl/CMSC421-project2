@@ -17,9 +17,8 @@
 #include <linux/rwlock.h>
 #include <linux/time.h>
 #include <linux/cred.h>
-//#include <rwlock.h>
-//#include <cred.h>
-
+#include <linux/init.h>
+#include <linux/spinlock.h>
 
 // TODO: Move these struct definitions to /include so we can do external variables
 
@@ -29,6 +28,7 @@ typedef struct syscall_entry {
     int numProcesses;
     bool init_state;
     unsigned int sl_size;
+    rwlock_t rwlock;
 } syscall_entry;
 
 struct skipList_node {
@@ -58,6 +58,7 @@ static unsigned int generate_random_int(void) {
 }
 
 static int sbx_init(void) {
+    printk("Begin sc arr initialization");
     if (INIT_STATE) {
         return 0;
     } else {
@@ -65,8 +66,10 @@ static int sbx_init(void) {
         int i;
         for (i = 0; i < 437; i++) {
             SC_ARR[i] = NULL;
+            // init lock
         }
         INIT_STATE = true;
+        printk("Initialization complete");
         return 0;
     }
 }
@@ -79,6 +82,7 @@ int skipList_create(unsigned long sysID, pid_t id) {
     if (uid > 0)
         return EPERM;*/
     // check if pid is good first
+    printk("begin lock checks");
     if (id < 0)
         return ENOENT;
     // check if sysID is in range
@@ -89,10 +93,17 @@ int skipList_create(unsigned long sysID, pid_t id) {
         return ENODEV;
     // various vars to keep track of skipList parameters
 
-    // lock
+    // write lock
+    printk("1");
 
+    printk("2");
     if (SC_ARR[sysID] == NULL) {
+        // allocate space for the entry
         SC_ARR[sysID] = kmalloc(sizeof(syscall_entry), GFP_KERNEL);
+        // init lock
+        rwlock_init(&SC_ARR[sysID]->rwlock);
+
+        write_lock(&SC_ARR[sysID]->rwlock);
         // create the head and tail skip list nodes
         SC_ARR[sysID]->sl_head = kmalloc(sizeof(struct skipList_node), GFP_KERNEL);
         SC_ARR[sysID]->sl_tail = kmalloc(sizeof(struct skipList_node), GFP_KERNEL);
@@ -117,8 +128,12 @@ int skipList_create(unsigned long sysID, pid_t id) {
         SC_ARR[sysID]->numProcesses = 0;
         SC_ARR[sysID]->init_state = true;
         SC_ARR[sysID]->sl_size = 0;
+
+        write_unlock(&SC_ARR[sysID]->rwlock);
     }
 
+
+    read_lock(&SC_ARR[sysID]->rwlock);
     unsigned int currLevel = MAX_SL_SIZE - 1;
     struct skipList_node *currNode = SC_ARR[sysID]->sl_head;
     struct skipList_node **nodes = kmalloc(MAX_SL_SIZE * sizeof(struct skipList_node *), GFP_KERNEL);
@@ -139,8 +154,13 @@ int skipList_create(unsigned long sysID, pid_t id) {
     // check if key already exists
     if (currNode->next[0]->process_id == id) {
         kfree(nodes);
+        // make sure we always unlock so we don't get stuck later
+        read_unlock(&SC_ARR[sysID]->rwlock);
         return EEXIST;
     }
+    read_unlock(&SC_ARR[sysID]->rwlock);
+    // switch to writer lock
+    write_lock(&SC_ARR[sysID]->rwlock);
 
     // figure out how high we need to go
     unsigned int newHeight = 1;
@@ -178,7 +198,8 @@ int skipList_create(unsigned long sysID, pid_t id) {
     }
 
     SC_ARR[sysID]->numProcesses++;
-    // UNLOCK
+    // WRITE UNLOCK
+    write_unlock(&SC_ARR[sysID]->rwlock);
 
     kfree(nodes);
 
@@ -195,6 +216,9 @@ static int skipList_print(unsigned long sysID) {
     // check if our specific sandbox has been initialized
     if (SC_ARR[sysID] == NULL)
         return ENODEV;
+
+    // lock
+    read_lock(&SC_ARR[sysID]->rwlock);
     printk("-------- Sandbox %lu -------- \n", sysID);
     printk("Currently Blocking %d processes \n", SC_ARR[sysID]->numProcesses);
     // loop through all the levels of the list so we can print out everything
@@ -213,6 +237,7 @@ static int skipList_print(unsigned long sysID) {
         }
         printk("\n");
     }
+    read_unlock(&SC_ARR[sysID]->rwlock);
     return 0;
 }
 
@@ -240,6 +265,7 @@ int skipList_destroy(unsigned long sysID, pid_t id) {
         // various vars to keep track of skipList parameters
 
         // LOCK
+        read_lock(&SC_ARR[sysID]->rwlock);
 
         unsigned int currLevel = SC_ARR[sysID]->sl_size;
         unsigned int targetHeight = 0;
@@ -265,6 +291,9 @@ int skipList_destroy(unsigned long sysID, pid_t id) {
             }
             //printk("E %d", i);
         }
+        read_unlock(&SC_ARR[sysID]->rwlock);
+        // switch from read to write
+        write_lock(&SC_ARR[sysID]->rwlock);
         printk("Successfully traversed skipList");
         // node to keep track of data to help us re-stitch the list later
         currNode = currNode->next[currLevel];
@@ -281,18 +310,16 @@ int skipList_destroy(unsigned long sysID, pid_t id) {
             printk("Freed things correctly");
 
             SC_ARR[sysID]->numProcesses--;
-
+            write_unlock(&SC_ARR[sysID]->rwlock);
             return 0;
         }
             // return error if mailbox doesnt exist
         else {
             kfree(nodes);
             printk("Freed in print statement");
+            write_unlock(&SC_ARR[sysID]->rwlock);
             return ENOENT;
         }
-
-        // UNLOCK
-        printk("Made it past unlock");
     }
 
 }
@@ -311,7 +338,7 @@ int skipList_search(unsigned long sysID, pid_t id) {
         // various vars to keep track of skipList parameters
 
         // LOCK
-
+        read_lock(&SC_ARR[sysID]->rwlock);
         unsigned int currLevel = SC_ARR[sysID]->sl_size;
         unsigned int targetHeight = 0;
         struct skipList_node *currNode = SC_ARR[sysID]->sl_head;
@@ -334,11 +361,13 @@ int skipList_search(unsigned long sysID, pid_t id) {
         // node to keep track of data to help us re-stitch the list later
         currNode = currNode->next[currLevel];
         if (currNode->process_id == id) {
+            read_unlock(&SC_ARR[sysID]->rwlock);
             return 0;
         }
             // return error if mailbox doesnt exist
         else {
             kfree(nodes);
+            read_unlock(&SC_ARR[sysID]->rwlock);
             return ENOENT;
         }
 
@@ -352,7 +381,6 @@ int skipList_search(unsigned long sysID, pid_t id) {
 // skipList data structure functions
 
 SYSCALL_DEFINE2(sbx421_block, pid_t, proc, unsigned long, nr) {
-    // TODO: change uid and pid method for kernel use
 
     uid_t uid = current_uid().val;
     pid_t pid = current->pid;
@@ -376,7 +404,6 @@ SYSCALL_DEFINE2(sbx421_block, pid_t, proc, unsigned long, nr) {
 }
 
 SYSCALL_DEFINE2(sbx421_unblock, pid_t, proc, unsigned long, nr) {
-    // TODO: Change uid method for kernel
 
     uid_t uid = current_uid().val;
 
@@ -390,7 +417,7 @@ SYSCALL_DEFINE2(sbx421_unblock, pid_t, proc, unsigned long, nr) {
 }
 
 SYSCALL_DEFINE2(sbx421_count, pid_t, proc, unsigned long, nr) {
-    // TODO: Change the uid method for kernel
+
     uid_t uid = current_uid().val;
     // check if the proc is in range
     if (proc < 1) {
@@ -411,11 +438,11 @@ SYSCALL_DEFINE2(sbx421_count, pid_t, proc, unsigned long, nr) {
             // various vars to keep track of skipList parameters
 
             // LOCK
-
+            read_lock(&SC_ARR[nr]->rwlock);
             unsigned int currLevel = SC_ARR[nr]->sl_size;
             unsigned int targetHeight = 0;
             struct skipList_node *currNode = SC_ARR[nr]->sl_head;
-            struct skipList_node **nodes = kmalloc(SC_ARR[nr]->sl_size * sizeof(struct skipList_node *) * 2, GFP_KERNEL);
+            struct skipList_node **nodes = kmalloc(MAX_SL_SIZE * sizeof(struct skipList_node *), GFP_KERNEL);
             // traverse through each level at a time
             int i = 0;
             for (i = SC_ARR[nr]->sl_size; i >= 0; i--) {
@@ -434,11 +461,13 @@ SYSCALL_DEFINE2(sbx421_count, pid_t, proc, unsigned long, nr) {
             // node to keep track of data to help us re-stitch the list later
             currNode = currNode->next[currLevel];
             if (currNode->process_id == proc) {
+                read_unlock(&SC_ARR[nr]->rwlock);
                 return currNode->blockCount;
             }
-                // return error if mailbox doesnt exist
+                // return error if sandbox doesnt exist
             else {
                 kfree(nodes);
+                read_unlock(&SC_ARR[nr]->rwlock);
                 return ENOENT;
             }
 
