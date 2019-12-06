@@ -116,6 +116,7 @@ int skipList_create(unsigned long sysID, pid_t id) {
         SC_ARR[sysID]->sl_head->blockCount = 0;
         SC_ARR[sysID]->numProcesses = 0;
         SC_ARR[sysID]->init_state = true;
+        SC_ARR[sysID]->sl_size = 0;
     }
 
     unsigned int currLevel = MAX_SL_SIZE - 1;
@@ -235,6 +236,7 @@ int skipList_destroy(unsigned long sysID, pid_t id) {
         return ENODEV;
 
     else {
+        printk("Made it past state check");
         // various vars to keep track of skipList parameters
 
         // LOCK
@@ -242,10 +244,13 @@ int skipList_destroy(unsigned long sysID, pid_t id) {
         unsigned int currLevel = SC_ARR[sysID]->sl_size;
         unsigned int targetHeight = 0;
         struct skipList_node *currNode = SC_ARR[sysID]->sl_head;
-        struct skipList_node **nodes = kmalloc(SC_ARR[sysID]->sl_size * sizeof(struct skipList_node *) * 2, GFP_KERNEL);
+        //printk("1");
+        struct skipList_node **nodes = kmalloc(MAX_SL_SIZE * sizeof(struct skipList_node *) , GFP_KERNEL);
+        //printk("2");
         // traverse through each level at a time
         int i = 0;
         for (i = SC_ARR[sysID]->sl_size; i >= 0; i--) {
+            //printk("B %d", i);
             // check if we aren't at the bottom yet
             if (currLevel > 0) {
                 currLevel--;
@@ -254,10 +259,13 @@ int skipList_destroy(unsigned long sysID, pid_t id) {
             // keep a history of everything as we go down
             nodes[i] = currNode;
             // loop to find anything to the right that isn't a tail
+            //printk("M %d", i);
             while (currNode->next[currLevel]->process_id < id && currNode->next[currLevel] != SC_ARR[sysID]->sl_tail) {
                 currNode = currNode->next[currLevel];
             }
+            //printk("E %d", i);
         }
+        printk("Successfully traversed skipList");
         // node to keep track of data to help us re-stitch the list later
         currNode = currNode->next[currLevel];
         if (currNode->process_id == id) {
@@ -270,6 +278,8 @@ int skipList_destroy(unsigned long sysID, pid_t id) {
             kfree(currNode);
             kfree(nodes);
 
+            printk("Freed things correctly");
+
             SC_ARR[sysID]->numProcesses--;
 
             return 0;
@@ -277,11 +287,12 @@ int skipList_destroy(unsigned long sysID, pid_t id) {
             // return error if mailbox doesnt exist
         else {
             kfree(nodes);
+            printk("Freed in print statement");
             return ENOENT;
         }
 
         // UNLOCK
-
+        printk("Made it past unlock");
     }
 
 }
@@ -304,7 +315,7 @@ int skipList_search(unsigned long sysID, pid_t id) {
         unsigned int currLevel = SC_ARR[sysID]->sl_size;
         unsigned int targetHeight = 0;
         struct skipList_node *currNode = SC_ARR[sysID]->sl_head;
-        struct skipList_node **nodes = kmalloc(SC_ARR[sysID]->sl_size * sizeof(struct skipList_node *) * 2, GFP_KERNEL);
+        struct skipList_node **nodes = kmalloc(MAX_SL_SIZE * sizeof(struct skipList_node *), GFP_KERNEL);
         // traverse through each level at a time
         int i = 0;
         for (i = SC_ARR[sysID]->sl_size; i >= 0; i--) {
@@ -350,10 +361,14 @@ SYSCALL_DEFINE2(sbx421_block, pid_t, proc, unsigned long, nr) {
         // Do this if the process id is greater than 0 and the USER is root
 
         // if the perms checkout, add them to the respective sandbox
-        return skipList_create(nr, proc);
+        long returnVal = skipList_create(nr, proc);
+        skipList_print(nr);
+        return returnVal;
     } else if (proc == 0) {
         // If the process is 0, only the calling process can block a call for itself
-        return skipList_create(nr, pid);
+         long returnVal = skipList_create(nr, pid);
+         skipList_print(nr);
+         return returnVal;
     } else {
         // if the security conditions aren't met return and error
         return EACCES;
@@ -366,7 +381,9 @@ SYSCALL_DEFINE2(sbx421_unblock, pid_t, proc, unsigned long, nr) {
     uid_t uid = current_uid().val;
 
     if (uid == 0) {
-        return skipList_destroy(nr, proc);
+        long returnVal = skipList_destroy(nr, proc);
+        skipList_print(nr);
+        return returnVal;
     } else {
         return EPERM;
     }

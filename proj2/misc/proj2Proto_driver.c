@@ -13,7 +13,7 @@
 int main() {
     printf("proj2Proto_driver.c\n\n");
     // initialize array of syscalls
-    sbx_init();
+    /*sbx_init();
 
     int pids[] = {5, 3, 2, 8, 14, 443, 80, 87, 22, 90, 56, 2};
 
@@ -75,7 +75,12 @@ int main() {
     // unblock test
     printf("\nUNBLOCK: 300 should not be here if you are root\n");
     sbx421_unblock(300,100);
-    skipList_print(100);
+    skipList_print(100);*/
+
+    printf("%lu\n",sbx421_block(420, 10));
+    skipList_print(10);
+    printf("%lu\n", sbx421_unblock(420, 10));
+    skipList_print(10);
 
     return 0;
 }

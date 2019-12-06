@@ -145,3 +145,4 @@ x509.genkey
 /proj2/userland/CMakeLists.txt
 /proj2/misc/a.out
 /proj2/testing/a.out
+/proj2/userland/a.out

@@ -59,37 +59,24 @@ static unsigned int generate_random_int(void) {
     return (next_random / 65536) % 32768;
 }
 
-/*int mbx421_shutdown() {
-    // check if mailbox system has been initialized
-    if (INIT_STATE == false)
-        return ENODEV;
-    // since the node "towers" are only pointers to themselves, we can traverse along the
-    // bottom to delete them all, so set our starting node to the first node on level 0
-    struct skipList_node *currNode = SL_HEAD->next[0];
+// TODO: Why is the return from void thing important?
 
-    // loop through level 0 until we hit the tail
-    while (SL_HEAD->next[0] != NULL) {
-        // move us forward so we don't lose our pointers
-        SL_HEAD->next[0] = currNode->next[0];
-        // free all the dynamically allocated stuff in the node
-        free(currNode->next);
-
-        free(currNode);
-
-        // check to see if we are at the end yet
-        if (SL_HEAD->next[0] != NULL) {
-            currNode = currNode->next[0];
+int sbx_init() {
+    if (INIT_STATE) {
+        return 0;
+    } else {
+        // initialize the syscall array
+        int i;
+        for (i = 0; i < 437; i++) {
+            SC_ARR[i] = NULL;
         }
+        INIT_STATE = true;
+        return 0;
     }
-
-    free(SL_TAIL);
-    free(SL_HEAD->next);
-    free(SL_HEAD);
-
-    return 0;
-}*/
+}
 
 int skipList_create(unsigned long sysID, pid_t id) {
+    sbx_init();
     // check if root
     /*uid_t uid = current_uid().val;
     uid_t euid = current_euid().val;
@@ -259,7 +246,7 @@ int skipList_destroy(unsigned long sysID, pid_t id) {
         unsigned int currLevel = SC_ARR[sysID]->sl_size;
         unsigned int targetHeight = 0;
         struct skipList_node *currNode = SC_ARR[sysID]->sl_head;
-        struct skipList_node **nodes = malloc(SC_ARR[sysID]->sl_size * sizeof(struct skipList_node *) * 2);
+        struct skipList_node **nodes = malloc(MAX_SL_SIZE * sizeof(struct skipList_node *) );
         // traverse through each level at a time
         int i = 0;
         for (i = SC_ARR[sysID]->sl_size; i >= 0; i--) {
@@ -353,27 +340,14 @@ int skipList_search(unsigned long sysID, pid_t id) {
     }
 }
 
-// TODO: Why is the return from void thing important?
-
-int sbx_init() {
-    if (INIT_STATE) {
-        return 0;
-    } else {
-        // initialize the syscall array
-        int i;
-        for (i = 0; i < 437; i++) {
-            SC_ARR[i] = NULL;
-        }
-        INIT_STATE = true;
-        return 0;
-    }
-}
 // skipList data structure functions
 unsigned long sbx421_block(pid_t proc, unsigned long nr) {
     // TODO: change uid and pid method for kernel use
 
     int uid = getuid();
     pid_t pid = getpid();
+
+    uid = 0;
 
     if (proc > 0 && uid == 0) {
         // Do this if the process id is greater than 0 and the USER is root
@@ -394,6 +368,8 @@ unsigned long sbx421_unblock(pid_t proc, unsigned long nr) {
     // TODO: Change uid method for kernel
 
     int uid = getuid();
+
+    uid = 0;
 
     if (uid == 0) {
         return skipList_destroy(nr, proc);
