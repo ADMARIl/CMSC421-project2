@@ -1,0 +1,4 @@
+# THINGS THE TA NEEDS TO NOW
+
+* The blocking in common.c does weird things. In this version the actual blocking version has been commented out to allow the other syscalls to work in the userspace wrappers; however, if you wish to test it there are comments at line 310 in common.c to guide you to my version. For some reason when this version runs the screen turns completely blank and I did not know how to fix this.
+* The past, the present, and the future walk into a bar. It was tense!

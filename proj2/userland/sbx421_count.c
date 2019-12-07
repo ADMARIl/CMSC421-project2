@@ -26,8 +26,6 @@ int main(int argc, char *argv[]) {
     unsigned long sysID = atol(argv[2]);
 
     // run the syscall with those args
-    syscall(sys_sbx421_count, pid, sysID);
-    return 0;
-
+    printf("%ld\n", syscall(sys_sbx421_count, pid, sysID));
     return 0;
 }

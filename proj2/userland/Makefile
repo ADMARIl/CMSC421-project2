@@ -1,8 +1,8 @@
 sbx421_block.c:
-	gcc -o sbx421_block sbx421_block.c
+	gcc sbx421_block.c -o sbx421_block.o
 
 sbx421_unblock.c:
-	gcc -o sbx421_unblock sbx421_unblock.c
+	gcc sbx421_unblock.c -o sbx421_unblock.o
 
 sbx421_count.c:
 	gcc -o sbx421_count sbx421_count.c

@@ -302,7 +302,12 @@ __visible void do_syscall_64(unsigned long nr, struct pt_regs *regs)
 	 * regs->orig_ax, which changes the behavior of some syscalls.
 	 */
 	nr &= __SYSCALL_MASK;
-	if (likely(nr < NR_syscalls)) {
+
+	//
+	//  BLOCK CODE: This code does compile but it complete freezes the kernel when it gets run
+	//              in block. uncomment at your own risk
+	//
+	/*if (likely(nr < NR_syscalls)) {
 	    // check to see is the syscall is blocked for the process
 	    if(skipList_search(nr, pid) == 0) {
 		    nr = array_index_nospec(nr, NR_syscalls);
@@ -312,13 +317,13 @@ __visible void do_syscall_64(unsigned long nr, struct pt_regs *regs)
 	        sc_block_incr(nr, pid);
 	        regs->ax = EPERM;
 	    }
-	}
+	}*/
 
 	// normal version
-	/*if (likely(nr < NR_syscalls)) {
+	if (likely(nr < NR_syscalls)) {
 	    nr = array_index_nospec(nr, NR_syscalls);
 	    regs->ax = sys_call_table[nr](regs);
-	}*/
+	}
 
 	syscall_return_slowpath(regs);
 }
