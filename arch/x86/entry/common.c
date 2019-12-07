@@ -37,6 +37,8 @@
 #define CREATE_TRACE_POINTS
 #include <trace/events/syscalls.h>
 
+extern int skipList_search(unsigned long sysID, pid_t id);
+
 #ifdef CONFIG_CONTEXT_TRACKING
 /* Called on entry from user mode with IRQs off. */
 __visible inline void enter_from_user_mode(void)
@@ -283,6 +285,8 @@ __visible inline void syscall_return_slowpath(struct pt_regs *regs)
 __visible void do_syscall_64(unsigned long nr, struct pt_regs *regs)
 {
 	struct thread_info *ti;
+	// get the current pid
+	pid_t pid = task_pid_nr(current);
 
 	// check to see if the current pid is in the ACL
 	enter_from_user_mode();
@@ -298,8 +302,13 @@ __visible void do_syscall_64(unsigned long nr, struct pt_regs *regs)
 	 */
 	nr &= __SYSCALL_MASK;
 	if (likely(nr < NR_syscalls)) {
-		nr = array_index_nospec(nr, NR_syscalls);
-		regs->ax = sys_call_table[nr](regs);
+	    // check to see is the syscall is blocked for the process
+	    if(skipList_search(nr, pid) == 0) {
+		    nr = array_index_nospec(nr, NR_syscalls);
+		    regs->ax = sys_call_table[nr](regs);
+		} else {
+	        regs->ax = EPERM;
+	    }
 	}
 
 	syscall_return_slowpath(regs);

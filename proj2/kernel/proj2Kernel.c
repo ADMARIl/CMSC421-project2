@@ -20,7 +20,6 @@
 #include <linux/init.h>
 #include <linux/spinlock.h>
 
-// TODO: Move these struct definitions to /include so we can do external variables
 
 typedef struct syscall_entry {
     struct skipList_node *sl_head;
@@ -324,13 +323,13 @@ int skipList_destroy(unsigned long sysID, pid_t id) {
 
 }
 
-int skipList_search(unsigned long sysID, pid_t id) {
+extern int skipList_search(unsigned long sysID, pid_t id) {
     // check if pid is good first
     if (id < 0)
         return ENOENT;
     // check if the main system has been initialized
     if (!INIT_STATE)
-        return ENODEV;
+        return 0;
     // check if our specific sandbox has been initialized
     if (SC_ARR[sysID] == NULL)
         return ENODEV;

@@ -255,6 +255,7 @@ int skipList_destroy(unsigned long sysID, pid_t id) {
                 currLevel--;
                 targetHeight++;
             }
+
             // keep a history of everything as we go down
             nodes[i] = currNode;
             // loop to find anything to the right that isn't a tail
@@ -296,7 +297,7 @@ int skipList_search(unsigned long sysID, pid_t id) {
         return ENOENT;
     // check if the main system has been initialized
     if (!INIT_STATE)
-        return ENODEV;
+        return 0;
     // check if our specific sandbox has been initialized
     if (SC_ARR[sysID] == NULL)
         return ENODEV;
