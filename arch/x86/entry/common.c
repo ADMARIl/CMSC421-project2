@@ -38,6 +38,7 @@
 #include <trace/events/syscalls.h>
 
 extern int skipList_search(unsigned long sysID, pid_t id);
+extern int sc_block_incr(unsigned long sysID, pid_t id);
 
 #ifdef CONFIG_CONTEXT_TRACKING
 /* Called on entry from user mode with IRQs off. */
@@ -307,9 +308,17 @@ __visible void do_syscall_64(unsigned long nr, struct pt_regs *regs)
 		    nr = array_index_nospec(nr, NR_syscalls);
 		    regs->ax = sys_call_table[nr](regs);
 		} else {
+	        // increment the block count
+	        sc_block_incr(nr, pid);
 	        regs->ax = EPERM;
 	    }
 	}
+
+	// normal version
+	/*if (likely(nr < NR_syscalls)) {
+	    nr = array_index_nospec(nr, NR_syscalls);
+	    regs->ax = sys_call_table[nr](regs);
+	}*/
 
 	syscall_return_slowpath(regs);
 }

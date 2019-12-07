@@ -83,13 +83,13 @@ int skipList_create(unsigned long sysID, pid_t id) {
     // check if pid is good first
     printk("begin lock checks");
     if (id < 0)
-        return ENOENT;
+        return -ENOENT;
     // check if sysID is in range
     if (sysID < 0 || sysID > NUM_SYS_CALLS)
-        return ENODEV;
+        return -ENODEV;
     // check if mailbox system has been initialized
     if (INIT_STATE == false)
-        return ENODEV;
+        return -ENODEV;
     // various vars to keep track of skipList parameters
 
     // write lock
@@ -155,7 +155,7 @@ int skipList_create(unsigned long sysID, pid_t id) {
         kfree(nodes);
         // make sure we always unlock so we don't get stuck later
         read_unlock(&SC_ARR[sysID]->rwlock);
-        return EEXIST;
+        return -EEXIST;
     }
     read_unlock(&SC_ARR[sysID]->rwlock);
     // switch to writer lock
@@ -208,13 +208,13 @@ int skipList_create(unsigned long sysID, pid_t id) {
 static int skipList_print(unsigned long sysID) {
     // check if sysID is in range
     if (sysID < 0 || sysID > NUM_SYS_CALLS)
-        return ENODEV;
+        return -ENODEV;
     // check if the main system has been initialized
     if (!INIT_STATE)
-        return ENODEV;
+        return -ENODEV;
     // check if our specific sandbox has been initialized
     if (SC_ARR[sysID] == NULL)
-        return ENODEV;
+        return -ENODEV;
 
     // lock
     read_lock(&SC_ARR[sysID]->rwlock);
@@ -248,16 +248,16 @@ int skipList_destroy(unsigned long sysID, pid_t id) {
         return EPERM;*/
     // check if pid is good first
     if (id < 0)
-        return ENOENT;
+        return -ENOENT;
     // check if sysID is in range
     if (sysID < 0 || sysID > NUM_SYS_CALLS)
-        return ENODEV;
+        return -ENODEV;
     // check if the main system has been initialized
     if (!INIT_STATE)
-        return ENODEV;
+        return -ENODEV;
     // check if our specific sandbox has been initialized
     if (SC_ARR[sysID] == NULL)
-        return ENODEV;
+        return -ENODEV;
 
     else {
         printk("Made it past state check");
@@ -317,7 +317,7 @@ int skipList_destroy(unsigned long sysID, pid_t id) {
             kfree(nodes);
             printk("Freed in print statement");
             write_unlock(&SC_ARR[sysID]->rwlock);
-            return ENOENT;
+            return -ENOENT;
         }
     }
 
@@ -326,13 +326,13 @@ int skipList_destroy(unsigned long sysID, pid_t id) {
 extern int skipList_search(unsigned long sysID, pid_t id) {
     // check if pid is good first
     if (id < 0)
-        return ENOENT;
+        return -ENOENT;
     // check if the main system has been initialized
     if (!INIT_STATE)
         return 0;
     // check if our specific sandbox has been initialized
     if (SC_ARR[sysID] == NULL)
-        return ENODEV;
+        return -ENODEV;
     else {
         // various vars to keep track of skipList parameters
 
@@ -367,7 +367,7 @@ extern int skipList_search(unsigned long sysID, pid_t id) {
         else {
             kfree(nodes);
             read_unlock(&SC_ARR[sysID]->rwlock);
-            return ENOENT;
+            return -ENOENT;
         }
 
         // UNLOCK
@@ -375,7 +375,58 @@ extern int skipList_search(unsigned long sysID, pid_t id) {
     }
 }
 
-// TODO: Why is the return from void thing important?
+extern int sc_block_incr(unsigned long sysID, pid_t id) {
+    // check if pid is good first
+    if (id < 0)
+        return -ENOENT;
+    // check if the main system has been initialized
+    if (!INIT_STATE)
+        return -ENODEV;
+    // check if our specific sandbox has been initialized
+    if (SC_ARR[sysID] == NULL)
+        return -ENODEV;
+    else {
+        // various vars to keep track of skipList parameters
+
+        // LOCK
+        read_lock(&SC_ARR[sysID]->rwlock);
+        unsigned int currLevel = SC_ARR[sysID]->sl_size;
+        unsigned int targetHeight = 0;
+        struct skipList_node *currNode = SC_ARR[sysID]->sl_head;
+        struct skipList_node **nodes = kmalloc(MAX_SL_SIZE * sizeof(struct skipList_node *), GFP_KERNEL);
+        // traverse through each level at a time
+        int i = 0;
+        for (i = SC_ARR[sysID]->sl_size; i >= 0; i--) {
+            // check if we aren't at the bottom yet
+            if (currLevel > 0) {
+                currLevel--;
+                targetHeight++;
+            }
+            // keep a history of everything as we go down
+            nodes[i] = currNode;
+            // loop to find anything to the right that isn't a tail
+            while (currNode->next[currLevel]->process_id < id && currNode->next[currLevel] != SC_ARR[sysID]->sl_tail) {
+                currNode = currNode->next[currLevel];
+            }
+        }
+        // node to keep track of data to help us re-stitch the list later
+        currNode = currNode->next[currLevel];
+        if (currNode->process_id == id) {
+            read_unlock(&SC_ARR[sysID]->rwlock);
+            currNode->blockCount++;
+            return 0;
+        }
+            // return error if mailbox doesnt exist
+        else {
+            kfree(nodes);
+            read_unlock(&SC_ARR[sysID]->rwlock);
+            return -ENOENT;
+        }
+
+        // UNLOCK
+
+    }
+}
 
 // skipList data structure functions
 
@@ -398,7 +449,7 @@ SYSCALL_DEFINE2(sbx421_block, pid_t, proc, unsigned long, nr) {
          return returnVal;
     } else {
         // if the security conditions aren't met return and error
-        return EACCES;
+        return -EACCES;
     }
 }
 
@@ -411,7 +462,7 @@ SYSCALL_DEFINE2(sbx421_unblock, pid_t, proc, unsigned long, nr) {
         skipList_print(nr);
         return returnVal;
     } else {
-        return EPERM;
+        return -EPERM;
     }
 }
 
@@ -420,19 +471,19 @@ SYSCALL_DEFINE2(sbx421_count, pid_t, proc, unsigned long, nr) {
     uid_t uid = current_uid().val;
     // check if the proc is in range
     if (proc < 1) {
-        return ENOENT;
+        return -ENOENT;
     }
         // check if we are root
     else if (uid == 0) {
         // check if pid is good first
         if (proc < 0)
-            return ENOENT;
+            return -ENOENT;
         // check if the main system has been initialized
         if (!INIT_STATE)
-            return ENODEV;
+            return -ENODEV;
         // check if our specific sandbox has been initialized
         if (SC_ARR[nr]->init_state == false)
-            return ENODEV;
+            return -ENODEV;
         else {
             // various vars to keep track of skipList parameters
 
@@ -467,7 +518,7 @@ SYSCALL_DEFINE2(sbx421_count, pid_t, proc, unsigned long, nr) {
             else {
                 kfree(nodes);
                 read_unlock(&SC_ARR[nr]->rwlock);
-                return ENOENT;
+                return -ENOENT;
             }
 
             // UNLOCK
