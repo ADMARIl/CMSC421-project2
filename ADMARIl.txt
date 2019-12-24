@@ -1,0 +1,45 @@
+CMSC 421 Project 2 Grade
+Total Possible Points: 100
+
+Student: aings1@umbc.edu
+GitHub Username: ADMARIl
+
+------------------------------------------------------------------
+General                                        
+    - Kernel successfully compiles                           :  5/5
+    - Tests                                                  :  8/15
+	- Initial design document                                : 15/15
+    - Final design document                                  : 20/20
+------------------------------------------------------------------
+System Calls
+    - Block                                                  :  8/10
+    - Unblock                                                :  8/10
+    - Count                                                  :  8/10
+------------------------------------------------------------------
+Kernel Intergration
+	- Can intercept a system call to block it                 : 5/7
+------------------------------------------------------------------
+Userspace Programs
+    - Unblock                                                 : 1/2
+    - Block                                                   : 1/2
+    - Count                                                   : 1/2
+    - Run                                                     : 1/2
+------------------------------------------------------------------
+Project Grade                                                 : 81
+Late penalty, if applicable                                   : 
+Misc. penalty                                                 : 
+------------------------------------------------------------------
+Curve                                                         : 8
+------------------------------------------------------------------
+
+Final Project 2 Grade                                         : 89/100
+
+Comments from the TA:
+
+------------------------------------------------------------------
+
+The system is not actually blocking the system calls
+
+Some of your errors are incorrect
+
+You should have more error messages and checks in your userspace programs
